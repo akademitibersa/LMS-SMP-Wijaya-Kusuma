@@ -146,7 +146,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Teachers
   const [teachers, setTeachers] = useState<TeacherAccount[]>(() => {
     const saved = localStorage.getItem('smpwk_teachers');
-    return saved ? JSON.parse(saved) : INITIAL_TEACHERS;
+    if (saved) {
+      try {
+        const parsed: TeacherAccount[] = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Merge any newly added teachers (e.g. Admin Hijir Ismail) that are not in local cache yet
+          const existingEmails = new Set(parsed.map((t) => t.email.toLowerCase()));
+          const missing = INITIAL_TEACHERS.filter((t) => !existingEmails.has(t.email.toLowerCase()));
+          if (missing.length > 0) {
+            const merged = [...parsed, ...missing];
+            try {
+              localStorage.setItem('smpwk_teachers', JSON.stringify(merged));
+            } catch {}
+            return merged;
+          }
+          return parsed;
+        }
+      } catch {}
+    }
+    return INITIAL_TEACHERS;
   });
 
   // Students list
@@ -547,7 +565,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       (t) =>
         t.email.toLowerCase() === cleanEmail ||
         t.email.toLowerCase().split('@')[0] === cleanEmail ||
-        t.name.toLowerCase().includes(cleanEmail)
+        t.name.toLowerCase().includes(cleanEmail) ||
+        cleanEmail.includes(t.name.toLowerCase()) ||
+        cleanEmail.includes(t.email.toLowerCase().split('@')[0])
     );
 
     if (!teacher) {

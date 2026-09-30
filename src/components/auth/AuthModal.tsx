@@ -524,9 +524,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Pilih Guru Terdaftar ({teachers.length} Guru Pengampu):
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-slate-700">
+                    Pilih Guru ({teachers.length} Akun Terdaftar):
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const hijir = teachers.find((t) => t.email.includes('hijir'));
+                      if (hijir) {
+                        setTeacherEmail(hijir.email);
+                        setTeacherPassword('SMPWKJaya');
+                      }
+                    }}
+                    className="text-[10px] text-blue-700 bg-blue-100 hover:bg-blue-200 px-2 py-0.5 rounded-full font-bold transition-colors cursor-pointer"
+                  >
+                    Pilih Admin Hijir Ismail
+                  </button>
+                </div>
                 <div className="relative">
                   <select
                     id="teacher-email-select"

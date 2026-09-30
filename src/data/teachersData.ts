@@ -137,4 +137,18 @@ export const INITIAL_TEACHERS: TeacherAccount[] = [
       },
     ],
   },
+  {
+    no: 10,
+    name: 'Admin Hijir Ismail',
+    email: 'hijirismail@smpwk.sch.id',
+    nip: '198807152014021005',
+    title: 'Dewan Guru & Administrator IT LMS SMPWK',
+    phone: '0812-8899-7711',
+    subjects: [
+      {
+        name: 'Informatika (TIK)',
+        classes: 'Kelas 7, Kelas 8, Kelas 9',
+      },
+    ],
+  },
 ];
