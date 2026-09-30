@@ -1,0 +1,784 @@
+import React, { useState, useEffect } from 'react';
+import { useApp } from '../../context/AppContext';
+import { Exam, ExamAttempt, Question, StudentAnswer } from '../../types';
+import { CbtUnbkSimulator } from './CbtUnbkSimulator';
+import { FirestoreExamRunner } from './FirestoreExamRunner';
+import {
+  HelpCircle,
+  Plus,
+  Play,
+  Clock,
+  Award,
+  FileText,
+  User,
+  BarChart3,
+  Eye,
+  Trash2,
+  Database,
+  ExternalLink,
+  Wifi,
+  Server,
+  Shield,
+  Languages,
+} from 'lucide-react';
+import { AuthModal } from '../auth/AuthModal';
+
+export const ExamHubView: React.FC = () => {
+  const { currentUser, exams, examAttempts, addExam, deleteExam, subjects, gradeExamEssay, siteSettings, setActiveTab } = useApp();
+  const [activeTakingExam, setActiveTakingExam] = useState<Exam | null>(null);
+  const [selectedSubTab, setSelectedSubTab] = useState<'available' | 'history'>('available');
+  const [showCreateExamModal, setShowCreateExamModal] = useState(false);
+  const [inspectAttempt, setInspectAttempt] = useState<ExamAttempt | null>(null);
+  const [manualEssayGradeMap, setManualEssayGradeMap] = useState<Record<string, number>>({});
+  const [essayFeedback, setEssayFeedback] = useState<string>('Jawaban esai telah diperiksa dan dinilai oleh guru.');
+  const [isTakingFirestoreExam, setIsTakingFirestoreExam] = useState<boolean>(false);
+
+  // CBT Redirect Server State
+  const rawUrl = siteSettings.cbtRedirectUrl || '192.168.1.7/ujian';
+  const targetUrl = rawUrl.startsWith('http://') || rawUrl.startsWith('https://') ? rawUrl : `http://${rawUrl}`;
+  const [forceInternalMode, setForceInternalMode] = useState(siteSettings.cbtMode === 'internal');
+  const [countdown, setCountdown] = useState<number | null>(siteSettings.cbtAutoRedirect !== false ? 3 : null);
+  const [autoRedirectCancelled, setAutoRedirectCancelled] = useState(false);
+
+  // Auto-redirect timer when portal opens
+  useEffect(() => {
+    if (forceInternalMode || autoRedirectCancelled || countdown === null) return;
+    if (countdown > 0) {
+      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+      return () => clearTimeout(timer);
+    } else if (countdown === 0) {
+      try {
+        window.open(targetUrl, '_blank', 'noopener,noreferrer');
+      } catch (err) {
+        console.warn('Auto redirect pop-up prevented by browser:', err);
+      }
+    }
+  }, [countdown, forceInternalMode, autoRedirectCancelled, targetUrl]);
+
+  // Auth Modal State
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<'admin' | 'teacher' | 'student' | 'register'>('student');
+
+  // If taking Firestore Exam
+  if (isTakingFirestoreExam) {
+    return <FirestoreExamRunner onExit={() => setIsTakingFirestoreExam(false)} />;
+  }
+
+  // If in CBT Local IP Server Redirect Mode (When configured for redirect)
+  if (!forceInternalMode && siteSettings.cbtMode === 'redirect') {
+    return (
+      <div id="cbt-local-redirect-portal" className="space-y-4 pb-12 animate-in fade-in">
+        {/* Main CBT Banner */}
+        <div className="bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 rounded-3xl p-5 sm:p-6 text-white text-center shadow-xl border border-blue-900/50 relative overflow-hidden">
+          {/* Status Badge */}
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 text-[11px] font-bold border border-blue-500/30 mb-3 backdrop-blur-xs">
+            <span className="w-2 h-2 rounded-full bg-blue-400 animate-ping"></span>
+            <span>Server Ujian CBT Lokal Siap</span>
+          </div>
+
+          <div className="w-16 h-16 rounded-3xl bg-blue-500/20 border-2 border-blue-400/40 text-blue-400 mx-auto flex items-center justify-center mb-3 shadow-inner">
+            <Wifi className="w-8 h-8 text-blue-400 animate-pulse" />
+          </div>
+
+          <h2 className="text-xl font-black text-white tracking-tight mb-1">
+            Portal Ujian CBT SMP Wijaya Kusuma
+          </h2>
+          <p className="text-xs text-blue-200/90 font-medium mb-4">
+            SMP Wijaya Kusuma
+          </p>
+
+          {/* Local IP Address Box */}
+          <div className="max-w-xs mx-auto p-3.5 bg-slate-900/90 rounded-2xl border border-blue-400/30 shadow-inner mb-4">
+            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block mb-1">
+              Alamat IP Server Ujian
+            </span>
+            <div className="font-mono text-sm sm:text-base font-black text-amber-400 break-all select-all">
+              {targetUrl}
+            </div>
+          </div>
+
+          {/* Auto Redirect Countdown */}
+          {countdown !== null && countdown > 0 && !autoRedirectCancelled && (
+            <div className="mb-4 p-2.5 bg-blue-500/10 border border-blue-500/30 rounded-xl max-w-xs mx-auto text-[11px] text-blue-200 flex items-center justify-between">
+              <span>Membuka otomatis dalam <strong>{countdown}s</strong>...</span>
+              <button
+                type="button"
+                onClick={() => setAutoRedirectCancelled(true)}
+                className="text-[10px] bg-white/10 hover:bg-white/20 text-blue-300 px-2 py-0.5 rounded-md font-bold cursor-pointer"
+              >
+                Batal
+              </button>
+            </div>
+          )}
+
+          {/* Main Action Buttons */}
+          <div className="max-w-xs mx-auto space-y-2.5">
+            <a
+              id="btn-open-cbt-server"
+              href={targetUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full py-3.5 px-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-500 text-white rounded-2xl font-black text-xs sm:text-sm shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 transition-transform active:scale-98 cursor-pointer"
+            >
+              <ExternalLink className="w-4 h-4" />
+              <span>Buka Server Ujian Sekarang</span>
+            </a>
+            <button
+              type="button"
+              onClick={() => {
+                setForceInternalMode(true);
+              }}
+              className="w-full py-2.5 px-3 bg-white/10 hover:bg-white/20 text-slate-200 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <span>Gunakan CBT Internal LMS SMP WK</span>
+            </button>
+          </div>
+
+          {currentUser && (
+            <div className="mt-4 pt-3 border-t border-white/10 text-[11px] text-slate-300">
+              Masuk sebagai: <strong className="text-white">{currentUser.name}</strong> ({currentUser.role.toUpperCase()})
+            </div>
+          )}
+        </div>
+
+        {/* Network & Device Instructions */}
+        <div className="p-4 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-3">
+          <h4 className="text-xs font-bold text-slate-800 flex items-center gap-2">
+            <Shield className="w-4 h-4 text-blue-600" />
+            <span>Petunjuk Mengikuti Ujian CBT:</span>
+          </h4>
+          <ol className="text-xs text-slate-600 space-y-2 list-decimal list-inside leading-relaxed">
+            <li>Pastikan perangkat terhubung ke <strong>WiFi Ujian SMP Wijaya Kusuma</strong> (LAN/Jaringan Lokal).</li>
+            <li>Klik tombol <strong>"Buka Server Ujian Sekarang"</strong> di atas.</li>
+            <li>Jika muncul peringatan keamanan browser pada IP lokal, pilih <strong>Lanjutkan / Tetap Buka</strong>.</li>
+            <li>Masukkan Nomor Peserta ujian dan token yang diberikan oleh Pengawas/Proktor.</li>
+          </ol>
+        </div>
+      </div>
+    );
+  }
+
+  // New Exam Form State
+  const [newTitle, setNewTitle] = useState('');
+  const [newCode, setNewCode] = useState('');
+  const [newSubjectId, setNewSubjectId] = useState(subjects[0]?.id || '');
+  const [newDuration, setNewDuration] = useState(45);
+  const [newPassingGrade, setNewPassingGrade] = useState(75);
+  const [newQuestions, setNewQuestions] = useState<Question[]>([
+    {
+      id: `q-init-1`,
+      type: 'pg',
+      questionText: 'Tatakrama basa Sunda anu digunakeun nalika nyarita ka saluhureun (sepuh/guru) nyaeta basa...',
+      options: [
+        { key: 'A', text: 'Lemes' },
+        { key: 'B', text: 'Loma / Akrab' },
+        { key: 'C', text: 'Kasar' },
+        { key: 'D', text: 'Garihal' },
+      ],
+      correctAnswer: 'A',
+      scoreWeight: 20,
+      explanation: 'Basa lemes digunakeun pikeun ngahormat saluhureun saperti sepuh jeung guru.',
+    },
+    {
+      id: `q-init-2`,
+      type: 'true_false',
+      questionText: 'Pupuh Kinanti mibanda 6 padalisan dina sabaitna kalawan guru wilangan jeung guru lagu 8-u, 8-i, 8-a, 8-i, 8-a, 8-i.',
+      correctAnswer: 'BENAR',
+      scoreWeight: 20,
+      explanation: 'Kaidah guru lagu jeung guru wilangan Pupuh Kinanti mangrupakeun aturan baku dina sastra Sunda.',
+    },
+    {
+      id: `q-init-3`,
+      type: 'essay',
+      questionText: 'Jelaskeun naon anu dimaksud undak usuk basa dina basa Sunda sarta naha urang kudu ngalarapkeunana dina kahirupan sapopoe!',
+      correctAnswer: 'Undak usuk basa Sunda nyaeta aturan sarta tingkatan ngagunakeun basa anu merenah dumasar saha anu diajak nyarita jeung situasi obrolan pikeun ngajaga silih hormat jeung kasopanan.',
+      scoreWeight: 60,
+      explanation: 'Siswa dinilai tina pamahaman etika kasopanan basa Sunda.',
+    },
+  ]);
+
+  // If student is currently taking an exam, render the full CBT Simulator!
+  if (activeTakingExam) {
+    return <CbtUnbkSimulator exam={activeTakingExam} onExit={() => setActiveTakingExam(null)} />;
+  }
+
+  const myAttempts = examAttempts.filter(
+    (att) => att.studentId === currentUser?.id || att.studentEmail === currentUser?.email
+  );
+
+  const handleAddQuestionToNewExam = (type: 'pg' | 'essay' | 'true_false') => {
+    const qCount = newQuestions.length + 1;
+    if (type === 'pg') {
+      setNewQuestions([
+        ...newQuestions,
+        {
+          id: `q-new-${Date.now()}-${qCount}`,
+          type: 'pg',
+          questionText: `Pertanyaan Pilihan Ganda #${qCount}: Jelaskan konsep...`,
+          options: [
+            { key: 'A', text: 'Pilihan Jawaban A' },
+            { key: 'B', text: 'Pilihan Jawaban B' },
+            { key: 'C', text: 'Pilihan Jawaban C' },
+            { key: 'D', text: 'Pilihan Jawaban D' },
+          ],
+          correctAnswer: 'A',
+          scoreWeight: 20,
+        },
+      ]);
+    } else if (type === 'true_false') {
+      setNewQuestions([
+        ...newQuestions,
+        {
+          id: `q-new-${Date.now()}-${qCount}`,
+          type: 'true_false',
+          questionText: `Pernyataan #${qCount}: Komputer membutuhkan IP Address untuk saling berkomunikasi di jaringan lokal.`,
+          correctAnswer: 'BENAR',
+          scoreWeight: 20,
+        },
+      ]);
+    } else {
+      setNewQuestions([
+        ...newQuestions,
+        {
+          id: `q-new-${Date.now()}-${qCount}`,
+          type: 'essay',
+          questionText: `Soal Uraian Esai #${qCount}: Uraikan langkah-langkah dalam...`,
+          correctAnswer: 'Kunci pedoman penilaian esai guru.',
+          scoreWeight: 40,
+        },
+      ]);
+    }
+  };
+
+  const handleSaveExam = (e: React.FormEvent) => {
+    e.preventDefault();
+    const sbj = subjects.find((s) => s.id === newSubjectId) || subjects[0];
+    const newExam: Exam = {
+      id: `exam-${Date.now()}`,
+      title: newTitle || `Ujian CBT ${sbj.name}`,
+      code: newCode || `CBT-${sbj.code}-${Date.now().toString().slice(-3)}`,
+      subjectId: sbj.id,
+      subjectName: sbj.name,
+      teacherId: currentUser?.id || 't-tarsoni',
+      teacherName: currentUser?.name || sbj.teacherName,
+      targetJenjang: sbj.jenjang,
+      targetJurusan: sbj.jurusan,
+      durationMinutes: Number(newDuration) || 45,
+      passingGrade: Number(newPassingGrade) || 75,
+      questions: newQuestions,
+      createdAt: new Date().toLocaleDateString('id-ID'),
+      isPublished: true,
+    };
+    addExam(newExam);
+    setShowCreateExamModal(false);
+    setNewTitle('');
+    setNewCode('');
+  };
+
+  const handleSaveEssayGrading = () => {
+    if (!inspectAttempt) return;
+    Object.entries(manualEssayGradeMap).forEach(([qId, score]) => {
+      gradeExamEssay(inspectAttempt.id, qId, score as number, essayFeedback);
+    });
+    setInspectAttempt(null);
+  };
+
+  return (
+    <div id="exam-hub-container" className="space-y-3.5 pb-12 animate-in fade-in">
+      {/* Header Banner */}
+      <div className="bg-gradient-to-r from-blue-700 via-blue-800 to-indigo-900 rounded-3xl p-4 sm:p-5 text-white shadow-xl space-y-2 border border-blue-600/50">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center space-x-2.5">
+            <div className="p-2 rounded-2xl bg-white/20 backdrop-blur-xs border border-white/20">
+              <Award className="w-5 h-5 text-amber-300" />
+            </div>
+            <div>
+              <h2 className="text-sm sm:text-base font-black tracking-tight">Portal CBT Online SMP Wijaya Kusuma</h2>
+              <p className="text-[11px] text-blue-100 font-medium">Asesmen Sumatif & Ujian Berbasis Komputer</p>
+            </div>
+          </div>
+          {currentUser?.role === 'guru' && (
+            <button
+              onClick={() => setShowCreateExamModal(true)}
+              className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-xl text-xs font-black flex items-center gap-1 shadow-md cursor-pointer transition-transform active:scale-95"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>+ Buat Paket Soal</span>
+            </button>
+          )}
+        </div>
+        <p className="text-xs text-blue-100/90 leading-relaxed">
+          Ujian online responsif dilengkapi pengatur waktu mundur (timer), koreksi otomatis, soal pilihan ganda, benar/salah, dan esai bertema Kurikulum Merdeka SMP Wijaya Kusuma.
+        </p>
+      </div>
+
+      {/* Sub Tabs */}
+      <div className="grid grid-cols-2 bg-slate-200/80 p-1 rounded-2xl text-xs font-bold">
+        <button
+          onClick={() => setSelectedSubTab('available')}
+          className={`py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+            selectedSubTab === 'available' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Play className="w-3.5 h-3.5" />
+          <span>Daftar Ujian Aktif ({exams.length})</span>
+        </button>
+        <button
+          onClick={() => setSelectedSubTab('history')}
+          className={`py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+            selectedSubTab === 'history' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <BarChart3 className="w-3.5 h-3.5" />
+          <span>
+            {currentUser?.role === 'guru'
+              ? `Hasil Siswa (${examAttempts.length})`
+              : `Riwayat Nilai (${myAttempts.length})`}
+          </span>
+        </button>
+      </div>
+
+      {/* SUBTAB 1: AVAILABLE EXAMS */}
+      {selectedSubTab === 'available' && (
+        <div className="space-y-3">
+          {/* Featured Bahasa Sunda CBT Card if exists */}
+          {exams.find((e) => e.subjectId === 'sbj-sunda') && (
+            <div className="p-4 bg-gradient-to-r from-blue-900 via-indigo-950 to-blue-950 text-white rounded-3xl border border-blue-400/40 shadow-md space-y-2.5 relative overflow-hidden">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] mb-1.5">
+                    <Languages className="w-3 h-3" />
+                    <span>Ujian Muatan Lokal (Basa Sunda)</span>
+                  </div>
+                  <h4 className="text-sm font-black text-white">
+                    Asesmen Sumatif Basa Sunda SMP Wijaya Kusuma
+                  </h4>
+                  <p className="text-[11px] text-blue-200 mt-1">
+                    Soal paguneman, pupuh Kinanti, kaulinan barudak, sarta tatakrama basa Sunda.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  const sundaExam = exams.find((e) => e.subjectId === 'sbj-sunda');
+                  if (sundaExam) setActiveTakingExam(sundaExam);
+                }}
+                className="w-full py-2.5 px-4 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs rounded-xl shadow-md flex items-center justify-center gap-2 cursor-pointer transition-transform active:scale-98"
+              >
+                <Play className="w-3.5 h-3.5 fill-current" />
+                <span>Mulai Kerjakan Ujian Basa Sunda</span>
+              </button>
+            </div>
+          )}
+
+          {/* Real-time Firestore CBT Exam Card */}
+          <div className="p-4 bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 text-white rounded-3xl border border-blue-500/30 shadow-md space-y-2.5 relative overflow-hidden">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-bold text-[10px] border border-blue-400/30 mb-1.5">
+                  <Database className="w-3 h-3 text-blue-400" />
+                  <span>Koleksi Bank Soal Cloud SMPWK</span>
+                </div>
+                <h4 className="text-sm font-black text-white">
+                  Simulasi CBT Bank Soal Terpadu
+                </h4>
+                <p className="text-[11px] text-blue-100/90 leading-relaxed mt-1">
+                  Mengerjakan butir soal terpadu dengan auto-save per nomor soal dan rekapan nilai otomatis.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setIsTakingFirestoreExam(true)}
+              className="w-full py-2.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-xs rounded-xl shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-98"
+            >
+              <Play className="w-3.5 h-3.5 fill-current" />
+              <span>Mulai Ujian Simulasi Bank Soal</span>
+            </button>
+          </div>
+
+          {/* List of Other Exams */}
+          {exams.map((exam) => (
+            <div
+              key={exam.id}
+              className="p-4 bg-white rounded-3xl border border-slate-200 shadow-xs hover:border-blue-400 transition-all space-y-3"
+            >
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 font-mono text-[10px] font-bold">
+                      {exam.code}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-medium">
+                      Kelas 7, 8, 9
+                    </span>
+                  </div>
+                  <h4 className="text-xs font-bold text-slate-900 leading-snug">{exam.title}</h4>
+                  <p className="text-[11px] text-slate-500 mt-0.5">Mapel: {exam.subjectName}</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <span className="text-[11px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
+                    KKM: {exam.passingGrade}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 py-2 bg-slate-50 rounded-2xl px-3 text-[11px] text-slate-600 border border-slate-100">
+                <div className="flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5 text-blue-600" />
+                  <span>{exam.durationMinutes} Menit</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <FileText className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>{exam.questions.length} Butir Soal</span>
+                </div>
+                <div className="flex items-center gap-1 text-slate-500 font-mono text-[10px]">
+                  <span>{exam.teacherName ? exam.teacherName.split(' ')[0] : 'Guru'}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-1">
+                {currentUser?.role === 'guru' && (
+                  <button
+                    onClick={() => deleteExam(exam.id)}
+                    className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg text-xs cursor-pointer"
+                    title="Hapus Ujian"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+                <button
+                  onClick={() => setActiveTakingExam(exam)}
+                  className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                  <span>{currentUser?.role === 'guru' ? 'Simulasi / Pratinjau Ujian CBT' : 'Mulai Kerjakan Ujian CBT'}</span>
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* SUBTAB 2: EXAM RESULTS */}
+      {selectedSubTab === 'history' && (
+        <div className="space-y-2.5">
+          {(currentUser?.role === 'guru' ? examAttempts : myAttempts).length === 0 ? (
+            <div className="p-8 text-center bg-white rounded-3xl border border-slate-200 text-slate-500 space-y-1">
+              <BarChart3 className="w-8 h-8 mx-auto text-slate-300 mb-1" />
+              <p className="text-xs font-semibold">Belum ada riwayat hasil ujian CBT yang tersimpan.</p>
+            </div>
+          ) : (
+            (currentUser?.role === 'guru' ? examAttempts : myAttempts).map((att) => (
+              <div
+                key={att.id}
+                className="p-4 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-2"
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider block">
+                      {att.subjectName}
+                    </span>
+                    <h4 className="text-xs font-bold text-slate-900 leading-snug">{att.examTitle}</h4>
+                    <p className="text-[11px] text-slate-600 flex items-center gap-1 mt-0.5">
+                      <User className="w-3 h-3 text-slate-400" />
+                      <span>
+                        {att.studentName} ({att.studentClass})
+                      </span>
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-base font-extrabold text-blue-700 font-mono">
+                      {att.totalScore} / {att.maxScore}
+                    </div>
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        att.isPassed
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-rose-100 text-rose-800'
+                      }`}
+                    >
+                      {att.isPassed ? 'LULUS' : 'REMEDIAL'}
+                    </span>
+                  </div>
+                </div>
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                  <span>PG: {att.pgScore} | Esai: {att.essayScore}</span>
+                  {currentUser?.role === 'guru' ? (
+                    <button
+                      onClick={() => {
+                        setInspectAttempt(att);
+                        const initialGrade: Record<string, number> = {};
+                        Object.keys(att.answers).forEach((qId) => {
+                          if (att.answers[qId].manualScore !== undefined) {
+                            initialGrade[qId] = att.answers[qId].manualScore || 0;
+                          }
+                        });
+                        setManualEssayGradeMap(initialGrade);
+                      }}
+                      className="px-2.5 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg font-bold text-xs flex items-center gap-1 cursor-pointer"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Koreksi Esai Siswa</span>
+                    </button>
+                  ) : (
+                    <span className="text-[10px] text-slate-400">
+                      Selesai dalam {Math.round(att.timeSpentSeconds / 60)} menit
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* MODAL: TEACHER CREATE EXAM */}
+      {showCreateExamModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/60 backdrop-blur-xs">
+          <div className="w-full max-w-md bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden max-h-[85vh] flex flex-col animate-in fade-in zoom-in-95">
+            <div className="bg-gradient-to-r from-blue-700 to-indigo-800 p-4 text-white flex items-center justify-between shrink-0">
+              <h4 className="text-xs font-bold flex items-center gap-1.5">
+                <Plus className="w-4 h-4 text-amber-300" />
+                <span>Buat Paket Soal Ujian CBT Baru</span>
+              </h4>
+              <button
+                onClick={() => setShowCreateExamModal(false)}
+                className="text-white/80 hover:text-white font-bold p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            <form onSubmit={handleSaveExam} className="p-4 space-y-3 overflow-y-auto flex-1 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Judul Ujian:</label>
+                <input
+                  type="text"
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  placeholder="Contoh: Asesmen Sumatif Bahasa Sunda"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800 font-semibold"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Kode Ujian:</label>
+                  <input
+                    type="text"
+                    value={newCode}
+                    onChange={(e) => setNewCode(e.target.value)}
+                    placeholder="Contoh: CBT-SND-01"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-1.5 text-xs text-slate-800 font-mono"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Mata Pelajaran:</label>
+                  <select
+                    value={newSubjectId}
+                    onChange={(e) => setNewSubjectId(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 font-semibold"
+                  >
+                    {subjects.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.code} - {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Durasi (Menit):</label>
+                  <input
+                    type="number"
+                    value={newDuration}
+                    onChange={(e) => setNewDuration(Number(e.target.value))}
+                    min={5}
+                    max={180}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-1.5 text-xs text-slate-800"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">KKM / Nilai Lulus:</label>
+                  <input
+                    type="number"
+                    value={newPassingGrade}
+                    onChange={(e) => setNewPassingGrade(Number(e.target.value))}
+                    min={50}
+                    max={100}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-1.5 text-xs text-slate-800 font-bold"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Questions List & Builder */}
+              <div className="pt-2 border-t border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-800">
+                    Daftar Butir Soal ({newQuestions.length} Butir):
+                  </span>
+                </div>
+                <div className="flex gap-1 overflow-x-auto pb-1">
+                  <button
+                    type="button"
+                    onClick={() => handleAddQuestionToNewExam('pg')}
+                    className="px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-[11px] font-bold shrink-0 cursor-pointer"
+                  >
+                    + Pilihan Ganda
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAddQuestionToNewExam('true_false')}
+                    className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-[11px] font-bold shrink-0 cursor-pointer"
+                  >
+                    + Benar / Salah
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAddQuestionToNewExam('essay')}
+                    className="px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-[11px] font-bold shrink-0 cursor-pointer"
+                  >
+                    + Soal Esai
+                  </button>
+                </div>
+
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {newQuestions.map((q, idx) => (
+                    <div key={q.id} className="p-2.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                      <div className="flex justify-between items-center text-[10px] font-bold">
+                        <span className="text-blue-700">
+                          #{idx + 1} • {q.type === 'pg' ? 'Pilihan Ganda' : q.type === 'true_false' ? 'Benar / Salah' : 'Esai'}
+                        </span>
+                        <span className="text-slate-500">Bobot: {q.scoreWeight} Poin</span>
+                      </div>
+                      <p className="text-[11px] text-slate-800 line-clamp-2">{q.questionText}</p>
+                      <p className="text-[10px] text-emerald-700 font-semibold">Kunci: {q.correctAnswer}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateExamModal(false)}
+                  className="flex-1 py-2 bg-slate-100 text-slate-700 rounded-xl font-semibold cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md shadow-blue-500/20 cursor-pointer"
+                >
+                  Terbitkan Paket Soal
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: TEACHER ESSAY GRADING */}
+      {inspectAttempt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/60 backdrop-blur-xs">
+          <div className="w-full max-w-md bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden max-h-[85vh] flex flex-col">
+            <div className="bg-gradient-to-r from-blue-700 to-indigo-800 p-4 text-white flex items-center justify-between shrink-0">
+              <div>
+                <h4 className="text-xs font-bold">Penilaian Esai & Verifikasi Ujian</h4>
+                <p className="text-[10px] text-blue-100">
+                  {inspectAttempt.studentName} • {inspectAttempt.studentClass}
+                </p>
+              </div>
+              <button
+                onClick={() => setInspectAttempt(null)}
+                className="text-white/80 hover:text-white font-bold p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-4 space-y-3 overflow-y-auto flex-1 text-xs">
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl space-y-1">
+                <div className="flex justify-between font-bold">
+                  <span>Skor Otomatis PG & B/S:</span>
+                  <span className="text-blue-800">{inspectAttempt.pgScore} Poin</span>
+                </div>
+                <div className="flex justify-between font-bold">
+                  <span>Skor Esai Saat Ini:</span>
+                  <span className="text-indigo-800">{inspectAttempt.essayScore} Poin</span>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <h5 className="font-bold text-slate-800">Jawaban Esai Siswa:</h5>
+                {(Object.entries(inspectAttempt.answers) as [string, StudentAnswer][]).map(([qId, ans], idx) => {
+                  return (
+                    <div key={qId} className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                      <span className="font-bold text-slate-700 block">Butir #{idx + 1}</span>
+                      <div className="p-2 bg-white rounded border border-slate-200 text-slate-800">
+                        <span className="text-[10px] text-slate-400 block mb-1">Teks Jawaban Siswa:</span>
+                        <p className="text-[11px] leading-relaxed">{ans.answer || '<Tidak Dijawab>'}</p>
+                      </div>
+                      <div className="flex items-center gap-2 pt-1">
+                        <label className="text-[11px] font-bold text-slate-700">Input Nilai Guru:</label>
+                        <input
+                          type="number"
+                          defaultValue={ans.manualScore || 30}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setManualEssayGradeMap((prev) => ({ ...prev, [qId]: val }));
+                          }}
+                          min={0}
+                          max={100}
+                          className="w-20 bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs font-bold text-blue-700"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Catatan Evaluasi Guru:</label>
+                <textarea
+                  value={essayFeedback}
+                  onChange={(e) => setEssayFeedback(e.target.value)}
+                  rows={2}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl p-2 text-xs"
+                />
+              </div>
+
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setInspectAttempt(null)}
+                  className="flex-1 py-2 bg-slate-100 text-slate-700 rounded-xl font-semibold cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveEssayGrading}
+                  className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-md shadow-blue-500/20 cursor-pointer"
+                >
+                  Simpan Nilai Akhir
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={isAuthOpen}
+        onClose={() => setIsAuthOpen(false)}
+        initialMode={authMode}
+      />
+    </div>
+  );
+};

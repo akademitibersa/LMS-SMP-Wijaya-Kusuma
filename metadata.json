@@ -1,0 +1,6 @@
+{
+  "name": "LMS SMP WK - SMP Wijaya Kusuma",
+  "description": "Learning Management System dan Portal Pembelajaran Digital SMP Wijaya Kusuma untuk Kelas 7, 8, dan 9.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
