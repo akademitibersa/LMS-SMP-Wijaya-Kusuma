@@ -251,13 +251,19 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
           <span className="text-[10px] text-slate-500">Kelas 7, 8, dan 9</span>
         </button>
 
-        <div className="p-3 bg-white rounded-2xl border border-slate-200 shadow-xs text-left">
-          <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center mb-2">
+        <button
+          onClick={() => {
+            const defaultSbj = subjects.find((s) => s.id === 'sbj-sunda') || subjects[0];
+            if (defaultSbj) onSelectSubject(defaultSbj);
+          }}
+          className="p-3 bg-white hover:bg-blue-50 rounded-2xl border border-slate-200 hover:border-blue-300 shadow-xs text-left transition-all group cursor-pointer"
+        >
+          <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center mb-2 group-hover:scale-105 transition-transform">
             <BookOpen className="w-5 h-5" />
           </div>
           <span className="font-bold text-xs text-slate-800 block">30 Modul & LKPD</span>
           <span className="text-[10px] text-slate-500">{subjects.length} Mapel Termasuk Basa Sunda</span>
-        </div>
+        </button>
 
         <div className="p-3 bg-white rounded-2xl border border-slate-200 shadow-xs text-left">
           <div className="w-9 h-9 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center mb-2">

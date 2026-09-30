@@ -297,15 +297,14 @@ export const ExamHubView: React.FC = () => {
               <p className="text-[11px] text-blue-100 font-medium">Asesmen Sumatif & Ujian Berbasis Komputer</p>
             </div>
           </div>
-          {currentUser?.role === 'guru' && (
             <button
+              id="btn-add-exam-package"
               onClick={() => setShowCreateExamModal(true)}
               className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-xl text-xs font-black flex items-center gap-1 shadow-md cursor-pointer transition-transform active:scale-95"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>+ Buat Paket Soal</span>
+              <span>+ Tambah Ujian</span>
             </button>
-          )}
         </div>
         <p className="text-xs text-blue-100/90 leading-relaxed">
           Ujian online responsif dilengkapi pengatur waktu mundur (timer), koreksi otomatis, soal pilihan ganda, benar/salah, dan esai bertema Kurikulum Merdeka SMP Wijaya Kusuma.

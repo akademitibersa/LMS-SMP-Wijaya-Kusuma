@@ -116,7 +116,7 @@ export const BottomNavigation: React.FC = () => {
               activeTab === 'subjects' ? 'font-black text-white' : 'font-semibold text-slate-600'
             }`}
           >
-            Mapel
+            Modul
           </span>
         </button>
 

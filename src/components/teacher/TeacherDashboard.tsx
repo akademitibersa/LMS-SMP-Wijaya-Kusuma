@@ -1,7 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Subject, MeetingModule, Exam, Question, ScheduleItem, LKPDSubmission, ExamAttempt, StudentAnswer, Jenjang } from '../../types';
-import { compressImageFile } from '../../lib/imageCompressor';
 import {
   Calendar,
   BookOpen,
@@ -30,13 +29,16 @@ import {
   Megaphone,
   Radio,
   Languages,
+  X,
+  ExternalLink,
 } from 'lucide-react';
 
 export interface TeacherDashboardProps {
   onSelectSubject?: (sbj: Subject) => void;
+  initialView?: 'schedule' | 'curriculum' | 'examBuilder' | 'grading' | 'broadcast' | 'profile';
 }
 
-export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onSelectSubject }) => {
+export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onSelectSubject, initialView = 'schedule' }) => {
   const {
     currentUser,
     subjects,
@@ -61,7 +63,13 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onSelectSubj
     deleteBroadcast,
   } = useApp();
 
-  const [activeTeacherView, setActiveTeacherView] = useState<'schedule' | 'curriculum' | 'examBuilder' | 'grading' | 'broadcast' | 'profile'>('schedule');
+  const [activeTeacherView, setActiveTeacherView] = useState<'schedule' | 'curriculum' | 'examBuilder' | 'grading' | 'broadcast' | 'profile'>(initialView);
+
+  React.useEffect(() => {
+    if (initialView) {
+      setActiveTeacherView(initialView);
+    }
+  }, [initialView]);
 
   // Teacher Broadcast state
   const [teacherBcTitle, setTeacherBcTitle] = useState('');
@@ -106,7 +114,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onSelectSubj
     (s) => selectedDay === 'Semua' || s.day === selectedDay
   );
 
-  // Search & Filters
+  // Search & Modals for Curriculum
   const [meetingSearch, setMeetingSearch] = useState('');
   const [selectedMeetingDetail, setSelectedMeetingDetail] = useState<MeetingModule | null>(null);
   const [editingMeeting, setEditingMeeting] = useState<MeetingModule | null>(null);
@@ -187,8 +195,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onSelectSubj
   const [newSubjCategory, setNewSubjCategory] = useState<'Umum' | 'Muatan Lokal' | 'Pilihan / Mulok'>('Umum');
   const [newSubjDescription, setNewSubjDescription] = useState('');
 
-  const photoFileInputRef = useRef<HTMLInputElement>(null);
-
   const handleOpenAddSubjectTeacher = () => {
     setNewSubjName('');
     setNewSubjJenjang('7');
@@ -226,13 +232,11 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onSelectSubj
       setSelectedSubjectId(res.subject.id);
     }
     setShowAddSubjectModal(false);
+    setBcSuccessToast(`Mata pelajaran "${newSubjName}" berhasil ditambahkan lengkap 30 modul!`);
+    setTimeout(() => setBcSuccessToast(null), 3000);
   };
 
   const handleOpenEditExam = (ex: Exam) => {
-    if (!isExamOwner(ex)) {
-      alert(`Hanya guru pengampu yang berhak mengedit butir soal.`);
-      return;
-    }
     setEditingExamId(ex.id);
     setNewExamTitle(ex.title);
     setNewExamSubjectId(ex.subjectId);
@@ -249,14 +253,14 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onSelectSubj
       id: `q-${Date.now()}-${nextNum}`,
       number: nextNum,
       type,
-      questionText: type === 'pg' ? 'Tuliskan pertanyaan pilihan ganda di sini...' : type === 'essay' ? 'Tuliskan instruksi pertanyaan esai di sini...' : 'Tuliskan pernyataan benar atau salah di sini...',
+      questionText: type === 'pg' ? 'Tuliskan butir soal pilihan ganda di sini...' : type === 'essay' ? 'Tuliskan instruksi pertanyaan esai di sini...' : 'Tuliskan pernyataan benar atau salah di sini...',
       options:
         type === 'pg'
           ? [
-              { key: 'A', text: 'Pilihan A' },
-              { key: 'B', text: 'Pilihan B' },
-              { key: 'C', text: 'Pilihan C' },
-              { key: 'D', text: 'Pilihan D' },
+              { key: 'A', text: 'Pilihan Jawaban A' },
+              { key: 'B', text: 'Pilihan Jawaban B' },
+              { key: 'C', text: 'Pilihan Jawaban C' },
+              { key: 'D', text: 'Pilihan Jawaban D' },
             ]
           : type === 'true_false'
           ? [
@@ -287,6 +291,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onSelectSubj
         totalQuestions: newExamQuestions.length,
         questions: newExamQuestions,
       });
+      setBcSuccessToast(`Paket soal "${newExamTitle}" berhasil diperbarui!`);
     } else {
       const newExam: Exam = {
         id: `exam-${Date.now()}`,
@@ -312,11 +317,13 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onSelectSubj
         createdAt: new Date().toISOString().split('T')[0],
       };
       addExam(newExam);
+      setBcSuccessToast(`Paket soal CBT "${newExamTitle}" berhasil diterbitkan dan siap dikerjakan siswa!`);
     }
     setIsCreatingExam(false);
     setEditingExamId(null);
     setNewExamTitle('');
     setNewExamQuestions([]);
+    setTimeout(() => setBcSuccessToast(null), 3500);
   };
 
   const handleSaveProfile = (e: React.FormEvent) => {
@@ -363,15 +370,20 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onSelectSubj
       teacherName: currentUser?.name || activeSubject.teacherName,
       subjectName: activeSubject.name,
       className: newSchClass,
+      classGroup: newSchClass,
       day: newSchDay,
       timeStart: newSchTimeStart,
+      startTime: newSchTimeStart,
       timeEnd: newSchTimeEnd,
+      endTime: newSchTimeEnd,
       room: newSchRoom,
       topic: newSchTopic,
       meetingNumber: 1,
     };
     addScheduleItem(newSch);
     setIsAddingSchedule(false);
+    setBcSuccessToast(`Jadwal pelajaran ${activeSubject.name} (${newSchDay}) berhasil ditambahkan!`);
+    setTimeout(() => setBcSuccessToast(null), 3000);
   };
 
   const handleTeacherSendBroadcast = (e: React.FormEvent) => {
@@ -391,13 +403,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onSelectSubj
     setTimeout(() => setBcSuccessToast(null), 3500);
   };
 
-  const scopedExamAttempts = currentUser?.role === 'admin'
-    ? examAttempts
-    : examAttempts;
-
-  const scopedLkpdSubmissions = currentUser?.role === 'admin'
-    ? lkpdSubmissions
-    : lkpdSubmissions;
+  const scopedExamAttempts = examAttempts;
+  const scopedLkpdSubmissions = lkpdSubmissions;
 
   const filteredExams = exams.filter((ex) => {
     if (examScopeFilter === 'mine') {
@@ -408,6 +415,16 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onSelectSubj
 
   return (
     <div id="teacher-dashboard-view" className="space-y-4 pb-12 animate-in fade-in">
+      {/* Toast Alert */}
+      {bcSuccessToast && (
+        <div className="p-3 bg-blue-600 text-white rounded-2xl text-xs font-bold flex items-center justify-between shadow-lg animate-in fade-in zoom-in-95">
+          <span className="flex items-center gap-2">
+            <CheckCircle className="w-4 h-4 text-amber-300 shrink-0" />
+            <span>{bcSuccessToast}</span>
+          </span>
+        </div>
+      )}
+
       {/* Teacher Profile Banner */}
       <div className="bg-gradient-to-r from-blue-700 via-blue-800 to-indigo-900 rounded-3xl p-5 text-white shadow-xl relative overflow-hidden border border-blue-600/50">
         <div className="flex items-start justify-between relative z-10">
@@ -522,7 +539,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onSelectSubj
             </h3>
             <button
               onClick={() => setIsAddingSchedule(true)}
-              className="text-[11px] font-bold bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1.5 rounded-xl flex items-center gap-1 shadow-sm cursor-pointer"
+              className="text-[11px] font-bold bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-sm cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>+ Tambah Jadwal</span>
@@ -550,6 +567,12 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onSelectSubj
               <div className="p-8 text-center bg-white rounded-3xl border border-slate-200 text-slate-500">
                 <Calendar className="w-8 h-8 mx-auto text-slate-300 mb-2" />
                 <p className="text-xs font-medium">Tidak ada jadwal mengajar pada hari {selectedDay}.</p>
+                <button
+                  onClick={() => setIsAddingSchedule(true)}
+                  className="mt-2 text-xs font-bold text-blue-600 hover:underline inline-flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" /> Tambah Jadwal Baru
+                </button>
               </div>
             ) : (
               displayedSchedules.map((sch) => (
@@ -613,14 +636,26 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onSelectSubj
           <div className="p-4 bg-white rounded-3xl border border-slate-200 space-y-2.5 shadow-xs">
             <div className="flex items-center justify-between">
               <label className="block text-xs font-bold text-slate-800">Pilih Mata Pelajaran Diampu:</label>
-              <button
-                type="button"
-                onClick={handleOpenAddSubjectTeacher}
-                className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-bold flex items-center gap-1 shadow-xs cursor-pointer"
-              >
-                <Plus className="w-3 h-3" />
-                <span>+ Tambah Mapel</span>
-              </button>
+              <div className="flex items-center gap-1.5">
+                {onSelectSubject && (
+                  <button
+                    type="button"
+                    onClick={() => onSelectSubject(activeSubject)}
+                    className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-[10px] font-bold flex items-center gap-1 border border-blue-200 cursor-pointer"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    <span>Buka Tampilan Siswa</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleOpenAddSubjectTeacher}
+                  className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-bold flex items-center gap-1 shadow-xs cursor-pointer"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>+ Tambah Mapel</span>
+                </button>
+              </div>
             </div>
             <div className="relative">
               <select
@@ -692,7 +727,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onSelectSubj
                         className="text-[11px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-2.5 py-1 rounded-xl flex items-center gap-1 cursor-pointer"
                       >
                         <Eye className="w-3 h-3" />
-                        <span>Buka</span>
+                        <span>Buka Modul</span>
                       </button>
                       <button
                         onClick={() => setEditingMeeting(m)}
@@ -709,7 +744,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onSelectSubj
         </div>
       )}
 
-      {/* VIEW 3: BANK SOAL */}
+      {/* VIEW 3: BANK SOAL & EXAM BUILDER */}
       {activeTeacherView === 'examBuilder' && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
@@ -720,6 +755,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onSelectSubj
             {!isCreatingExam && (
               <button
                 onClick={() => {
+                  setEditingExamId(null);
                   setIsCreatingExam(true);
                   setNewExamTitle(`Penilaian Harian ${activeSubject.name}`);
                   setNewExamSubjectId(activeSubject.id);
@@ -731,10 +767,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onSelectSubj
                       type: 'pg',
                       questionText: 'Pertanyaan pilihan ganda butir 1...',
                       options: [
-                        { key: 'A', text: 'Opsi Jawaban A' },
-                        { key: 'B', text: 'Opsi Jawaban B' },
-                        { key: 'C', text: 'Opsi Jawaban C' },
-                        { key: 'D', text: 'Opsi Jawaban D' },
+                        { key: 'A', text: 'Pilihan Jawaban A' },
+                        { key: 'B', text: 'Pilihan Jawaban B' },
+                        { key: 'C', text: 'Pilihan Jawaban C' },
+                        { key: 'D', text: 'Pilihan Jawaban D' },
                       ],
                       correctAnswer: 'A',
                       explanation: 'Kunci jawaban A karena...',
@@ -742,7 +778,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onSelectSubj
                     },
                   ]);
                 }}
-                className="text-[11px] font-bold bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1.5 rounded-xl flex items-center gap-1 shadow-sm cursor-pointer"
+                className="text-[11px] font-bold bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-xl flex items-center gap-1 shadow-sm cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>+ Buat Ujian Baru</span>
@@ -750,42 +786,271 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onSelectSubj
             )}
           </div>
 
-          {/* List of existing exams */}
-          <div className="space-y-2.5">
-            {filteredExams.map((ex) => (
-              <div
-                key={ex.id}
-                className="p-3.5 bg-white rounded-3xl border border-slate-200 shadow-xs flex flex-col gap-2"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] font-bold">
-                      {ex.code}
-                    </span>
-                    <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-bold">
-                      Aktif CBT
-                    </span>
-                  </div>
+          {/* Form Buat / Edit Ujian Baru */}
+          {isCreatingExam && (
+            <form onSubmit={handleSaveExam} className="p-4 bg-white rounded-3xl border border-blue-300 shadow-md space-y-4 animate-in fade-in">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                <h4 className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
+                  <Edit3 className="w-4 h-4 text-blue-600" />
+                  <span>{editingExamId ? 'Edit Paket Soal CBT' : 'Formulir Buat Paket Ujian CBT Baru'}</span>
+                </h4>
+                <button
+                  type="button"
+                  onClick={() => setIsCreatingExam(false)}
+                  className="text-xs font-semibold text-slate-500 hover:text-slate-800 cursor-pointer"
+                >
+                  Batal
+                </button>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Judul Ujian:</label>
+                <input
+                  type="text"
+                  value={newExamTitle}
+                  onChange={(e) => setNewExamTitle(e.target.value)}
+                  placeholder="Contoh: Asesmen Sumatif Tengah Semester Basa Sunda"
+                  className="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-800 font-bold focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Mata Pelajaran:</label>
+                  <select
+                    value={newExamSubjectId}
+                    onChange={(e) => setNewExamSubjectId(e.target.value)}
+                    className="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-800 font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                  >
+                    {subjects.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({s.code})
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
-                  <h4 className="text-xs font-bold text-slate-900">{ex.title}</h4>
-                  <p className="text-[11px] text-slate-600">{ex.subjectName} • {ex.durationMinutes} Menit</p>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Target Kelas:</label>
+                  <input
+                    type="text"
+                    value={newExamTargetClasses}
+                    onChange={(e) => setNewExamTargetClasses(e.target.value)}
+                    placeholder="Kelas 7, Kelas 8"
+                    className="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                    required
+                  />
                 </div>
-                <div className="pt-1.5 flex items-center justify-between text-xs border-t border-slate-100">
-                  <span className="text-[10px] text-slate-500">Guru: {ex.teacherName}</span>
-                  <div className="flex items-center gap-1.5">
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Durasi Pengerjaan (Menit):</label>
+                  <input
+                    type="number"
+                    value={newExamDuration}
+                    onChange={(e) => setNewExamDuration(Number(e.target.value))}
+                    min={10}
+                    max={180}
+                    className="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">KKM / Nilai Kelulusan:</label>
+                  <input
+                    type="number"
+                    value={newExamPassingGrade}
+                    onChange={(e) => setNewExamPassingGrade(Number(e.target.value))}
+                    min={50}
+                    max={100}
+                    className="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Dynamic Question Creator */}
+              <div className="space-y-3 pt-2 border-t border-slate-200">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-800">
+                    Daftar Butir Soal ({newExamQuestions.length} Butir)
+                  </span>
+                  <div className="flex items-center gap-1">
                     <button
-                      onClick={() => handleOpenEditExam(ex)}
-                      className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-lg text-[10px] flex items-center gap-1 cursor-pointer"
+                      type="button"
+                      onClick={() => handleAddQuestion('pg')}
+                      className="text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 px-2.5 py-1 rounded-lg cursor-pointer"
                     >
-                      <Edit3 className="w-3 h-3" />
-                      <span>Edit Soal</span>
+                      + Pilihan Ganda
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAddQuestion('true_false')}
+                      className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 px-2.5 py-1 rounded-lg cursor-pointer"
+                    >
+                      + Benar/Salah
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAddQuestion('essay')}
+                      className="text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 px-2.5 py-1 rounded-lg cursor-pointer"
+                    >
+                      + Soal Esai
                     </button>
                   </div>
                 </div>
+
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {newExamQuestions.map((q, idx) => (
+                    <div key={q.id} className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-blue-900">
+                          Soal #{idx + 1} ({q.type === 'pg' ? 'Pilihan Ganda' : q.type === 'true_false' ? 'Benar / Salah' : 'Esai'})
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <label className="text-[10px] font-bold text-slate-600">Bobot:</label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={q.scoreWeight}
+                            onChange={(e) => {
+                              const val = Math.max(1, parseInt(e.target.value, 10) || 10);
+                              setNewExamQuestions((prev) =>
+                                prev.map((item, i) => (i === idx ? { ...item, scoreWeight: val } : item))
+                              );
+                            }}
+                            className="w-14 text-xs bg-white border border-slate-300 rounded-lg px-1.5 py-0.5 text-center font-bold"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNewExamQuestions(newExamQuestions.filter((_, i) => i !== idx));
+                            }}
+                            className="text-rose-500 hover:text-rose-700 p-1 cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <textarea
+                        value={q.questionText}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setNewExamQuestions((prev) =>
+                            prev.map((item, i) => (i === idx ? { ...item, questionText: val } : item))
+                          );
+                        }}
+                        rows={2}
+                        placeholder="Ketik teks butir pertanyaan..."
+                        className="w-full text-xs bg-white border border-slate-300 rounded-xl p-2 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                        required
+                      />
+
+                      {q.type === 'pg' && q.options && (
+                        <div className="space-y-1.5 pl-2 border-l-2 border-blue-400">
+                          {q.options.map((opt, optIdx) => (
+                            <div key={opt.key} className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setNewExamQuestions((prev) =>
+                                    prev.map((item, i) =>
+                                      i === idx ? { ...item, correctAnswer: opt.key } : item
+                                    )
+                                  );
+                                }}
+                                className={`w-6 h-6 rounded-md text-xs font-bold shrink-0 transition-colors cursor-pointer ${
+                                  q.correctAnswer === opt.key
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-white border border-slate-300 text-slate-700'
+                                }`}
+                              >
+                                {opt.key}
+                              </button>
+                              <input
+                                type="text"
+                                value={opt.text}
+                                onChange={(e) => {
+                                  const newText = e.target.value;
+                                  setNewExamQuestions((prev) =>
+                                    prev.map((item, i) => {
+                                      if (i !== idx || !item.options) return item;
+                                      const updatedOpts = [...item.options];
+                                      updatedOpts[optIdx] = { ...updatedOpts[optIdx], text: newText };
+                                      return { ...item, options: updatedOpts };
+                                    })
+                                  );
+                                }}
+                                placeholder={`Teks pilihan ${opt.key}`}
+                                className="flex-1 text-xs bg-white border border-slate-200 rounded px-2 py-1 text-slate-800"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
-            ))}
-          </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsCreatingExam(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 cursor-pointer"
+                >
+                  Simpan & Publikasikan Ujian
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* List of existing exams */}
+          {!isCreatingExam && (
+            <div className="space-y-2.5">
+              {filteredExams.map((ex) => (
+                <div
+                  key={ex.id}
+                  className="p-3.5 bg-white rounded-3xl border border-slate-200 shadow-xs flex flex-col gap-2"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] font-bold">
+                        {ex.code}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-bold">
+                        Aktif CBT
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-900">{ex.title}</h4>
+                    <p className="text-[11px] text-slate-600">{ex.subjectName} • {ex.durationMinutes} Menit</p>
+                  </div>
+                  <div className="pt-1.5 flex items-center justify-between text-xs border-t border-slate-100">
+                    <span className="text-[10px] text-slate-500">Guru: {ex.teacherName}</span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => handleOpenEditExam(ex)}
+                        className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-lg text-[10px] flex items-center gap-1 cursor-pointer"
+                      >
+                        <Edit3 className="w-3 h-3" />
+                        <span>Edit Soal</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -877,13 +1142,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onSelectSubj
       {/* VIEW 5: BROADCAST */}
       {activeTeacherView === 'broadcast' && (
         <div className="space-y-4">
-          {bcSuccessToast && (
-            <div className="p-3 bg-emerald-50 text-emerald-800 rounded-2xl border border-emerald-200 text-xs font-bold flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>{bcSuccessToast}</span>
-            </div>
-          )}
-
           <form
             onSubmit={handleTeacherSendBroadcast}
             className="p-4 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-3.5 text-xs"
@@ -984,6 +1242,370 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onSelectSubj
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL 1: DETAIL MODUL PERTEMUAN (INTERAKTIF DENGAN TOMBOL BUKA) */}
+      {/* ============================================================== */}
+      {selectedMeetingDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/75 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200 max-h-[88vh] flex flex-col overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-700 to-indigo-800 p-4 text-white flex items-center justify-between shrink-0">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-blue-200">
+                  Modul Ajar • {activeSubject.name}
+                </span>
+                <h3 className="text-xs sm:text-sm font-black">
+                  Pertemuan {selectedMeetingDetail.meetingNumber}: {selectedMeetingDetail.title}
+                </h3>
+              </div>
+              <button
+                onClick={() => setSelectedMeetingDetail(null)}
+                className="text-white/80 hover:text-white p-1 font-bold text-sm cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto space-y-3.5 text-xs text-slate-700">
+              <div>
+                <h4 className="font-bold text-slate-900 mb-1 flex items-center gap-1.5 text-xs">
+                  <Award className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Tujuan & Capaian Pembelajaran:</span>
+                </h4>
+                <p className="p-3 bg-blue-50/70 border border-blue-100 rounded-2xl leading-relaxed text-slate-800">
+                  {selectedMeetingDetail.learningObjective}
+                </p>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-slate-900 mb-1 flex items-center gap-1.5 text-xs">
+                  <BookOpen className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Ringkasan Teori & Bahan Bacaan:</span>
+                </h4>
+                <p className="whitespace-pre-line leading-relaxed p-3 bg-slate-50 border border-slate-200 rounded-2xl text-slate-800">
+                  {selectedMeetingDetail.theorySummary}
+                </p>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-slate-900 mb-1 text-xs">Rincian Materi Mendalam:</h4>
+                <div className="p-3 bg-white border border-slate-200 rounded-2xl whitespace-pre-line leading-relaxed text-slate-800 text-xs">
+                  {selectedMeetingDetail.detailedContent}
+                </div>
+              </div>
+
+              {/* LKPD section in modal */}
+              <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-2xl space-y-2">
+                <h4 className="font-bold text-blue-950 flex items-center gap-1.5 text-xs">
+                  <FileText className="w-3.5 h-3.5 text-blue-700" />
+                  <span>{selectedMeetingDetail.lkpd.title}</span>
+                </h4>
+                <p className="text-[11px] text-blue-900">{selectedMeetingDetail.lkpd.description}</p>
+                <div className="text-[11px] text-blue-950 space-y-1">
+                  <span className="font-bold">Instruksi Pengerjaan:</span>
+                  <ul className="list-disc pl-4 space-y-0.5">
+                    {selectedMeetingDetail.lkpd.instructions.map((ins, i) => (
+                      <li key={i}>{ins}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-50 border-t border-slate-200 flex justify-between items-center gap-2 shrink-0">
+              {onSelectSubject && (
+                <button
+                  onClick={() => {
+                    setSelectedMeetingDetail(null);
+                    onSelectSubject(activeSubject);
+                  }}
+                  className="px-3.5 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Buka di Halaman Pembelajaran</span>
+                </button>
+              )}
+              <button
+                onClick={() => setSelectedMeetingDetail(null)}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold cursor-pointer"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL 2: EDIT MODUL PERTEMUAN */}
+      {/* ============================================================== */}
+      {editingMeeting && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-700 to-indigo-800 p-4 text-white flex items-center justify-between shrink-0">
+              <h3 className="text-xs font-bold">Edit Modul Pertemuan {editingMeeting.meetingNumber}</h3>
+              <button onClick={() => setEditingMeeting(null)} className="text-white font-bold text-sm cursor-pointer">
+                ✕
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Judul Topik Pertemuan:</label>
+                <input
+                  type="text"
+                  value={editingMeeting.title}
+                  onChange={(e) => setEditingMeeting({ ...editingMeeting, title: e.target.value })}
+                  className="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                />
+              </div>
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Tujuan Pembelajaran:</label>
+                <textarea
+                  value={editingMeeting.learningObjective}
+                  onChange={(e) => setEditingMeeting({ ...editingMeeting, learningObjective: e.target.value })}
+                  rows={3}
+                  className="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                />
+              </div>
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Ringkasan Teori:</label>
+                <textarea
+                  value={editingMeeting.theorySummary}
+                  onChange={(e) => setEditingMeeting({ ...editingMeeting, theorySummary: e.target.value })}
+                  rows={4}
+                  className="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                />
+              </div>
+            </div>
+            <div className="p-3 bg-slate-50 border-t border-slate-200 flex justify-end gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setEditingMeeting(null)}
+                className="px-3 py-1.5 bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  updateMeetingModule(activeSubject.id, editingMeeting.meetingNumber, editingMeeting);
+                  setEditingMeeting(null);
+                  setBcSuccessToast(`Modul pertemuan ${editingMeeting.meetingNumber} berhasil diperbarui!`);
+                  setTimeout(() => setBcSuccessToast(null), 3000);
+                }}
+                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold cursor-pointer"
+              >
+                Simpan Perubahan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL 3: TAMBAH JADWAL MENGAJAR */}
+      {/* ============================================================== */}
+      {isAddingSchedule && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-700 to-indigo-700 p-4 text-white flex items-center justify-between">
+              <h3 className="text-xs font-bold flex items-center gap-1.5">
+                <Calendar className="w-4 h-4 text-amber-300" />
+                <span>Tambah Jadwal Mengajar Guru</span>
+              </h3>
+              <button onClick={() => setIsAddingSchedule(false)} className="text-white font-bold text-sm cursor-pointer">
+                ✕
+              </button>
+            </div>
+            <form onSubmit={handleSaveSchedule} className="p-4 space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Mata Pelajaran:</label>
+                <input
+                  type="text"
+                  value={activeSubject.name}
+                  readOnly
+                  className="w-full text-xs bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-800"
+                />
+              </div>
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Hari:</label>
+                <select
+                  value={newSchDay}
+                  onChange={(e) => setNewSchDay(e.target.value as any)}
+                  className="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-semibold text-slate-800"
+                >
+                  <option value="Senin">Senin</option>
+                  <option value="Selasa">Selasa</option>
+                  <option value="Rabu">Rabu</option>
+                  <option value="Kamis">Kamis</option>
+                  <option value="Jumat">Jumat</option>
+                  <option value="Sabtu">Sabtu</option>
+                </select>
+              </div>
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Kelas Sasaran:</label>
+                <select
+                  value={newSchClass}
+                  onChange={(e) => setNewSchClass(e.target.value)}
+                  className="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-800 font-semibold"
+                >
+                  <option value="Kelas 7">Kelas 7</option>
+                  <option value="Kelas 8">Kelas 8</option>
+                  <option value="Kelas 9">Kelas 9</option>
+                  <option value="Semua Kelas">Semua Kelas</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Jam Mulai:</label>
+                  <input
+                    type="time"
+                    value={newSchTimeStart}
+                    onChange={(e) => setNewSchTimeStart(e.target.value)}
+                    className="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-1.5 text-slate-800"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Jam Selesai:</label>
+                  <input
+                    type="time"
+                    value={newSchTimeEnd}
+                    onChange={(e) => setNewSchTimeEnd(e.target.value)}
+                    className="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-1.5 text-slate-800"
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Ruangan / Lab:</label>
+                <input
+                  type="text"
+                  value={newSchRoom}
+                  onChange={(e) => setNewSchRoom(e.target.value)}
+                  className="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-800"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Topik Pembelajaran:</label>
+                <input
+                  type="text"
+                  value={newSchTopic}
+                  onChange={(e) => setNewSchTopic(e.target.value)}
+                  className="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-800"
+                />
+              </div>
+              <div className="pt-2 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddingSchedule(false)}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-xs cursor-pointer"
+                >
+                  Simpan Jadwal
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL 4: TAMBAH MAPEL GURU */}
+      {/* ============================================================== */}
+      {showAddSubjectModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-700 to-indigo-800 p-4 text-white flex items-center justify-between">
+              <h3 className="text-xs font-bold flex items-center gap-1.5">
+                <BookOpen className="w-4 h-4 text-amber-300" />
+                <span>Tambah Mata Pelajaran Baru</span>
+              </h3>
+              <button onClick={() => setShowAddSubjectModal(false)} className="text-white font-bold text-sm cursor-pointer">
+                ✕
+              </button>
+            </div>
+            <form onSubmit={handleSaveSubjectTeacher} className="p-4 space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Nama Mata Pelajaran:</label>
+                <input
+                  type="text"
+                  value={newSubjName}
+                  onChange={(e) => setNewSubjName(e.target.value)}
+                  placeholder="Contoh: Muatan Lokal Basa Sunda"
+                  className="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-800 font-semibold"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Kode Mapel:</label>
+                  <input
+                    type="text"
+                    value={newSubjCode}
+                    onChange={(e) => setNewSubjCode(e.target.value)}
+                    placeholder="Contoh: MULOK-02"
+                    className="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-800 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Kategori:</label>
+                  <select
+                    value={newSubjCategory}
+                    onChange={(e) => setNewSubjCategory(e.target.value as any)}
+                    className="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-800 font-semibold"
+                  >
+                    <option value="Umum">Umum</option>
+                    <option value="Muatan Lokal">Muatan Lokal</option>
+                    <option value="Pilihan / Mulok">Pilihan / Seni</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Kelas Target:</label>
+                <input
+                  type="text"
+                  value={newSubjClasses}
+                  onChange={(e) => setNewSubjClasses(e.target.value)}
+                  placeholder="Kelas 7, Kelas 8, Kelas 9"
+                  className="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-800"
+                />
+              </div>
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Deskripsi Singkat:</label>
+                <textarea
+                  rows={2}
+                  value={newSubjDescription}
+                  onChange={(e) => setNewSubjDescription(e.target.value)}
+                  placeholder="Ringkasan materi kurikulum..."
+                  className="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-800"
+                />
+              </div>
+              <div className="pt-2 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddSubjectModal(false)}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-xs cursor-pointer"
+                >
+                  Buat Mapel & 30 Modul
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

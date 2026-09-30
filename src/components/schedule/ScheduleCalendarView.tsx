@@ -63,11 +63,6 @@ export const ScheduleCalendarView: React.FC = () => {
   });
 
   const openCreateModal = () => {
-    if (!currentUser) {
-      setAuthMode('teacher');
-      setIsAuthOpen(true);
-      return;
-    }
     setEditingScheduleId(null);
     setFormDay(selectedDay);
     setFormSubjectName(subjects[0]?.name || 'Bahasa Sunda (Muatan Lokal)');
@@ -75,16 +70,11 @@ export const ScheduleCalendarView: React.FC = () => {
     setFormEndTime('09:00');
     setFormClassGroup(currentUser?.rombel || 'Kelas 7');
     setFormRoom('Ruang Teori 7-A');
-    setFormTeacherName(currentUser?.name || 'Dewan Guru SMPWK');
+    setFormTeacherName(currentUser?.name || 'Admin Hijir Ismail');
     setShowModal(true);
   };
 
   const openEditModal = (sch: ScheduleItem) => {
-    if (!currentUser) {
-      setAuthMode('teacher');
-      setIsAuthOpen(true);
-      return;
-    }
     setEditingScheduleId(sch.id);
     setFormDay(sch.day);
     setFormSubjectName(sch.subjectName);
@@ -213,16 +203,14 @@ export const ScheduleCalendarView: React.FC = () => {
               <Smartphone className="w-3.5 h-3.5 text-amber-300" />
               <span>Sync Kalender</span>
             </button>
-            {(currentUser?.role === 'guru' || currentUser?.role === 'admin') && (
-              <button
-                id="btn-add-schedule-item"
-                onClick={openCreateModal}
-                className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-xl text-xs font-black flex items-center gap-1 shadow-md transition-transform active:scale-95 cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>+ Jadwal</span>
-              </button>
-            )}
+            <button
+              id="btn-add-schedule-item"
+              onClick={openCreateModal}
+              className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-xl text-xs font-black flex items-center gap-1 shadow-md transition-transform active:scale-95 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>+ Tambah Jadwal</span>
+            </button>
           </div>
         </div>
 

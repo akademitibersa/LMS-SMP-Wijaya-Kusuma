@@ -469,6 +469,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       cleanEmail.includes('fathi') ||
       cleanEmail.includes('admin') ||
       cleanEmail.includes('kepsek') ||
+      cleanEmail.includes('hijir') ||
       cleanEmail === ADMIN_CREDENTIALS.email.toLowerCase() ||
       cleanEmail === ADMIN_CREDENTIALS.altEmail.toLowerCase();
 
@@ -485,14 +486,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       };
     }
 
+    const isHijir = cleanEmail.includes('hijir');
     const adminUser: User = {
-      id: 'admin-headmaster',
-      name: adminCustomProfile.name || ADMIN_CREDENTIALS.name,
-      email: ADMIN_CREDENTIALS.email,
+      id: isHijir ? 'teacher-admin-hijir' : 'admin-headmaster',
+      name: isHijir ? 'Admin Hijir Ismail' : (adminCustomProfile.name || ADMIN_CREDENTIALS.name),
+      email: isHijir ? 'hijirismail@smpwk.sch.id' : ADMIN_CREDENTIALS.email,
       role: 'admin',
-      title: ADMIN_CREDENTIALS.title,
+      title: isHijir ? 'Administrator IT & Dewan Guru SMPWK' : ADMIN_CREDENTIALS.title,
       avatar: adminCustomProfile.avatar || ADMIN_CREDENTIALS.avatar,
-      phone: adminCustomProfile.phone || '0812-3456-7890',
+      phone: isHijir ? '0812-8899-7711' : (adminCustomProfile.phone || '0812-3456-7890'),
     };
 
     setCurrentUser(adminUser);

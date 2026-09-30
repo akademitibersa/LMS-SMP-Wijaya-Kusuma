@@ -44,10 +44,10 @@ const MainAppContent: React.FC = () => {
 
     case 'subjects':
       if (currentUser?.role === 'admin') {
-        return <AdminDashboard onSelectSubject={(sbj: Subject) => setSelectedSubject(sbj)} />;
+        return <AdminDashboard onSelectSubject={(sbj: Subject) => setSelectedSubject(sbj)} initialTab="subjects" />;
       }
       return currentUser?.role === 'guru' ? (
-        <TeacherDashboard onSelectSubject={(sbj: Subject) => setSelectedSubject(sbj)} />
+        <TeacherDashboard onSelectSubject={(sbj: Subject) => setSelectedSubject(sbj)} initialView="curriculum" />
       ) : (
         <StudentDashboard
           onSelectSubject={(sbj: Subject) => setSelectedSubject(sbj)}

@@ -81,9 +81,10 @@ export const THEME_OPTIONS: {
 
 interface AdminDashboardProps {
   onSelectSubject?: (subject: Subject) => void;
+  initialTab?: 'overview' | 'approvals' | 'security' | 'broadcast' | 'identity' | 'theme' | 'teachers' | 'grades' | 'subjects';
 }
 
-export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onSelectSubject }) => {
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onSelectSubject, initialTab = 'overview' }) => {
   const {
     currentUser,
     siteSettings,
@@ -114,7 +115,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onSelectSubject 
     updateUserProfile,
   } = useApp();
 
-  const [activeAdminTab, setActiveAdminTab] = useState<'overview' | 'approvals' | 'security' | 'broadcast' | 'identity' | 'theme' | 'teachers' | 'grades' | 'subjects'>('overview');
+  const [activeAdminTab, setActiveAdminTab] = useState<'overview' | 'approvals' | 'security' | 'broadcast' | 'identity' | 'theme' | 'teachers' | 'grades' | 'subjects'>(initialTab);
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveAdminTab(initialTab);
+    }
+  }, [initialTab]);
   const [successToast, setSuccessToast] = useState<string | null>(null);
 
   // Student Approval & Management State
